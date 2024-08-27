@@ -1,0 +1,66 @@
+---
+title: "Final Project Check Up Memo"
+subtitle: "Data Science 1 with R (STAT 301-1)"
+author: "Kayla Terrelonge"
+date: "11/20/2022"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    code-fold: show
+    link-external-newwindow: true
+    
+execute:
+  warning: false
+  message: false
+  
+from: markdown+emoji  
+---
+
+## Demonstration of Progress
+
+Over the past few weeks, I have began tackling my final project. However, despite outlining a detailed plan and schedule in my previous memo, I have not been able to keep up with my designated plan. This is due to the amount of time data importing has taken. To begin, the source of my data [ESPN NBA Stats section](https://www.espn.com/nba/stats) does not have an extract option for their data, meaning I had to spend a significant amount of time web scraping. The web scraping process included writing functions in google sheets to import the data into a sheet. The function used to extract the data from ESPN and import it into the sheet `=IMPORTHTML("hyperlink", "table",1)`, where the hyperlink is the link to each season's statistics. Then, because each season's data is under a different link, I had to create separate sheets for each season to import them with the function from above, then I had to manually merge each sheet into one cohesive data frame, as the individual sheets posed great challenges when trying to be imported to R. Then, the data frame was extracted as a `.csv` file and imported into R with the `read_delim()` function. Now, I am working on tidying the data, which should not be too much work given the amount of time I spent on the scraping process.
+
+```{r}
+#| label: load-pkges
+library(tidyverse)
+library(skimr)
+library(readr)
+```
+
+```{r}
+#| label: importing-data
+nba_reg_szn <- read_delim("data///NBA_Data_301  - nba_reg_season.csv") %>% 
+print()
+```
+
+```{r}
+#| label: intro-data-inspect
+# skimming data
+nba_reg_szn %>% 
+  skim()
+# simple plot
+nba_reg_szn %>% 
+  ggplot(mapping = aes(x = `3PA`, y = `3P%`)) +
+  geom_jitter() +
+  facet_wrap(~Season) +
+  labs(title = "3 Point Averages v Percentage of 3 Pointers Made",
+       x = "Avg 3 Pointer Attempts",
+       y = "% of 3 Pointers Made")
+
+```
+
+## Progress Assessment
+
+Despite the challenges listed above, I think that now that I am over the hurdle of web scraping and data importing I am still on track to complete the project by the Nov.30th deadline. Given how tedious and challenging web scraping and data importing was, I am very satisfied with my progress so far. An interesting thing that I have learned about my data so far is that players can play for multiple teams within one season. Intuitively I understand that a player can be traded mid-season, however it was surprising to see in my data multiple times. This has lead me to consider adding a section to evaluate player performance for players who were transferred mid-season.
+
+## Next Steps
+
+In the following days, I plan to find some supplementary data sets to help strengthen the quality of my EDA and beginning to create my visualizations.
+
+## Demonstration of Organization
+
+The screenshot is showing that I am working in a project, my data files are organized in a folder and I have all the proper documents in one final project folder.
+
+![](images/paste-0A182447.png)

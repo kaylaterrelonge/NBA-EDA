@@ -1,0 +1,40 @@
+---
+title: "Final Project Data Memo"
+subtitle: "Data Science 1 with R (STAT 301-1)"
+author: "Kayla Terrelonge"
+date: "10/31/2022"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    code-fold: show
+    link-external-newwindow: true
+    
+execute:
+  warning: false
+  message: false
+  
+---
+
+## Data Source
+
+For my final project I will be analyzing all teams in the National Basketball Association performance before COVID, during COVID, and after COVID. To complete this project, I will be using data from ESPN, specifically their NBA statistics, from the past 20 years, starting with the 02-03 season.
+
+The data source from this project is from the ESPN NBA Statistics site [ESPN NBA Statistics site](https://www.espn.com/nba/stats/team/\_/season/2021/seasontype/2). Because this data source is updated regularly, I have placed the following constraints on my data set, there will be no data for the current season (22-23 season). This choice was made because the stats for the current season are updated nightly and given the timeline for the project, it would be unrealistic to try to keep up with the current season. It is also important to note that the season will not be over until well past the due date for the project, making the choice to eliminate the current season more logical.
+
+For this project, I will be analyzing team performance per season and comparing them by year, with the 2019-2020 season being the year of interest in seeing if any major trends changed during the time of the pandemic. In order to collect this data, because ESPN does not have an export option for their statistics tables, I will use the import data from web function in excel to get the data into an .xsl file, which can then be read into R.
+
+For this project, because ESPN separates teams stats per year, I will have to join all of the seasons together into one cohesive data frame.
+
+## Why This Data
+
+I decided to choose this data set because I am an avid NBA fan and I hope to become a sports analyst in the future, so working with this data set is giving me a feel for what my future potential career may entail. In addition to this, my original plan for the final project included looking for a relationship between playing time and injury, however after speaking with Prof. Sass, she encouraged that this question would be better suited for the next class in the sequence, therefore, I wanted to begin this project now in hopes of continuing it later on in the academic year to create one big data project.
+
+## Potential Issues
+
+When thinking ahead to issues that may arise during the completion of this project, the main issue that comes to mind is exporting the data from ESPN and cleaning and tidying the data. I also think that because of issues such as franchises being bought/sold mid season or changes in team names, there will be issues in processing and analyzing the data per team, meaning that another dataset with franchise changes, such as team name or location, may need to be used in addition to the main dataset to accurately account for these changes.
+
+## Tentative Timeline
+
+For this project, I hope to have it completed before the Nov. 30th early submission deadline. In order to do this, I have broken the project up into 4 main sections which are: Data Import & Tidying, EDA, Data Visualization, and Conclusions. I hope to have the Data Import section completed by the first week of November. Then, by Nov. 15, I want to have the EDA and Visualizations completed, and Finally, I want to complete the conclusion section before Thanksgiving break, and then meet with a TA or the professor to review my project before submitting it.

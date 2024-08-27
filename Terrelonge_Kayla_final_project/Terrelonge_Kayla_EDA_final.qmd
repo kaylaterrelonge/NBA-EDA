@@ -1,0 +1,494 @@
+---
+title: "Comparing NBA Performance Pre-Pandemic & Post-Pandemic"
+subtitle: "Long Form EDA"
+author: "Kayla Terrelonge"
+date: "11/30/2022"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    code-fold: true
+    link-external-newwindow: true
+    
+execute:
+  warning: false
+  message: false
+  echo: false
+  
+from: markdown+emoji  
+---
+
+## Introduction
+
+The following research project is an exploratory data analysis focused on investigating NBA player performance trends and determining if the global pandemic effected player performance. Player data from pre-pandemic seasons, pandemic seasons, and post-pandemic seasons were aggregated into one large data set to aid in the investigation. In addition to this, coaching data from these particular seasons was collected as a secondary resource. The data for this project was scraped from [ESPN NBA Stats section](https://www.espn.com/nba/stats) and [Basketball Reference](https://www.basketball-reference.com/leagues/NBA_2020_coaches.html). For an in-depth explanation of the data collection and cleaning processes, please refer to the `r-scripts` directory.
+
+The research question that guided this investigation was "How has the pandemic impacted player performance in the NBA?". Since the pandemic was an unprecedented event where the full effects of it may not be extensively covered for quite a long time, this question is important as it can provide some insight into how the pandemic effected the physical health, stamina, and performance of professional athletes. With this question in mind, the goal of this investigation was to uncover a possible correlation between the pandemic and decreased performance in NBA players. Performance was measured via a player's field goal percentage, which is the percentage of how many shots each player made during the season. This is used to assess as scoring is very important for the success of a team and is most beneficial when ranking a player's ability to play the sport.
+
+For this project, in order to complete an accurate analysis, the following stipulations were put into place. The current NBA season, the 2022-2023 season, was not included in the data set as the data would not be completed until after the due date of the project. 
+
+
+```{r}
+#| label: load-pkgs
+library(tidyverse)
+library(dplyr)
+library(lvplot)
+library(stringr)
+library(forcats)
+library(skimr)
+library(hexbin)
+library(lattice)
+library(gridExtra)
+```
+## Data Processing
+
+```{r}
+#| label: data_import_and_skimming
+nba_player_data <- read_csv("data/processed_data/nba_data_processed.csv")
+nba_coaching_data <-  read_csv("data/processed_data/coaching_data_processed.csv")
+
+
+```
+Before beginning this investigation, an evaluation of the data was conducted to address any unusual characteristics of the data. In terms of variables in `nba_player_data` most were numeric, with `season`, `name`,`POS`,`team`, and `team_class` being exceptions. These were considered identifier variables, which were used for grouping to conduct various forms of analysis. As for the variables in `nba_coaching_data`, all variables were identifiers and non-numeric, except for `year_w_team`. When these data sets were combined, the common variable of `team` and `season` acted as keys to combine the data frames.
+
+In terms of missing values and impossible values, there were no impossible values and both data sets contained missing values. Missing values were defined as `NA` and not values equal to zero. Due to the size of the data sets and the fact that the data from previous years was not initially recorded on the data source's website, the missing values can be attributed to  data entry errors or mishaps when exporting from the data site.
+
+## Investigation
+
+
+```{r}
+#| label: data_manipulation
+# classifying seasons in respect to the pandemic
+pandemic_classification_data <- nba_player_data %>% 
+  mutate(pandemic_status = fct_collapse(season, 
+                                         `pre-pandemic` = c("2001-2002","2002-2003", "2003-2004",
+                                                          "2004-2005","2005-2006","2006-2007",
+                                                          "2007-2008","2008-2009","2009-2010",
+                                                          "2010-2011","2011-2012", 
+                                                          "2012-2013","2013-2014",
+                                                          "2014-2015","2015-2016",
+                                                          "2016-2017", "2017-2018","2018-2019"),
+                                        `pandemic` = c("2019-2020", "2020-2021"),
+                                        `post-pandemic` = c("2021-2022")
+                                         )) 
+# fixing labeling error in data 
+corrected_pandemic_data <- pandemic_classification_data%>% 
+  mutate(team = fct_collapse(team, 
+                                        `ATL` = c("IATL","ATL"),
+                                        `BKN` = c("IBKN", "BKN"),
+                                        `BOS` = c("IBOS","BOS"),
+                                        `CHA` = c("ICHA", "CHA"),
+                                        `CHI` = c("ICHI", "CHI"),
+                             `CLE` = c("ICLE", "CLE"),
+                             `DEN` = c("IDEN", "DEN"),
+                             `DET` = c("IDET", "DET"),
+                             `IND` = c("IIND", "IND"),
+                             `NO` = c("IINO", "NO"),
+                             `NY` = c("IINY", "NY"),
+                             `LAL` = c("ILAL", "LAL"),
+                             `MEM` = c("IMEM", "MEM", "VMEM"),
+                             `MIA` = c("IMIA", "MIA"),
+                             `MIL` = c("IMIL", "MIL"),
+                             `MIN` = c("IMIN", "MIN","VMIN"),
+                             `PHI` = c("IPHI", "PHI"),
+                             `SAC` = c("ISAC", "SAC"),
+                             `SA` = c("IVSA", "SA"),
+                             `WSH` = c("IWSH", "WSH"),
+                             `POR` = c("VPOR", "POR", "IPOR"),
+                             `GS` = c("IIGS", "GS"),
+                             `HOU` = c("IHOU", "HOU"),
+                             `OKC` = c("IOKC", "OKC"),
+                             `ORL` = c("IORL", "ORL"),
+                             `TOR` = c("ITOR", "TOR")))
+```
+
+### Pre-Pandemic Analysis 
+
+To begin this investigation, the conditions of the games were analyzed. Condition was defined through the variables `MINS`, which represents the average minutes a player played in each game that season, and `GP`, which is the average games played by a player in a season. These are used to define the conditions of each season because it will give an idea of how many games happened on average during a season and what was the normal amount of time a player spent in the game. The mean of these values were taken and are shown below.
+
+```{r}
+#| label: pre_pandemic_conditions
+# filtering out pre-pandemic data
+pre_pandemic_nba_data <-
+  corrected_pandemic_data%>% 
+  filter(pandemic_status == "pre-pandemic")
+# analyzing the conditions via summary statistics 
+pre_pandemic_nba_data %>% 
+  select(GP, MIN) %>% 
+  summarise(avg_mins_played = mean(MIN, na.rm = TRUE),
+            avg_games_played = mean(GP, na.rm = TRUE))
+```
+
+After getting an idea of what the average season looked like pre-pandemic, the next step in the investigation was to see if there was a pattern in the average `FG%` per each season and to get an idea of pre-pandemic trends. A line plot was created to assess this change. The plot showed no obvious trend, there are typically periods of increasing trends, with the 2011-2012 season having the highest average field goal percentage.
+
+```{r}
+#| label: plot_1
+pre_pandemic_nba_data %>% 
+  group_by(season) %>% 
+  summarise(mean_field_goal = mean(`FG%`, na.rm = TRUE)) %>% 
+  ggplot(mapping = aes(x = season, y = mean_field_goal, group = 1)) +
+  geom_line() +
+  # increasing readability of plot labels
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(title = "Average Field Goal Percentages per Season Pre-Pandemic",
+       x = "Season",
+       y = "Average Field Goal Percentage")
+```
+
+Since no obvious relationship was observed between `season` and `FG%`, the variable `rank` was then used to explore a relationship. Since most seasons had players ranked to values above 500, the top 100 players of each season were  considered as the best players of that season. From there, the relationship between higher `rank` and the average `FG%` was visualized via a scatterplot. From this plot, a broad relationship was seen between a higher `rank` and a higher `FG%`. This is to be expected as players with higher `FG%` are considered better scorers, making them better players.
+
+```{r}
+#| label: plot_2
+pre_pandemic_nba_data %>% 
+  filter(rank <= 100) %>% 
+  group_by(rank) %>% 
+  mutate(avg_field_goal = mean(`FG%`, na.rm = TRUE)) %>% 
+  ggplot(aes(x = rank , y = avg_field_goal)) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) 
+```
+
+From here, the distribution of `FG%` over each season was investigated to see if the distribution of `FG%` increased or decreased over time. Again, there were no drastic changes or trends. However, it should be noted that as the years progressed on, there were more outliers with 100% as their value. When taking into consideration increased technology, which made it easier for more player data to be reported, these values are not extreme, as they often represent players who were lower in `rank` and attempted less field goals, making it easier to get a perfect percentage of field goals made.  
+
+```{r}
+#| label: plots_3_4
+# visualization to show the relationship between FGA and FG%
+pre_pandemic_nba_data %>% 
+  ggplot(mapping = aes(x = FGA, y = `FG%`)) +
+  geom_hex() +
+  labs(title = "Attempted Field Goals vs Field Goal Percentages",
+       x = "Number of Attempted Field Goals",
+       y = "Field Goal Percentage")
+
+# boxplot showing the distribution of FG% per season
+pre_pandemic_nba_data %>% 
+  group_by(team) %>% 
+  ggplot(mapping = aes(x = (season), y = `FG%`)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(title = "Field Goal Percentage Distribution per Season Pre-Pandemic",
+       x = "Season",
+       y = "Field Goal Percentage")
+```
+The heat map above shows that players with `FG%` = 100% had a smaller number of attempted field goals. The heat map also shows that most of the players fall between 40% and 50% `FG%`, with roughly 4 to 10 field goals attempted. Meaning that the more field goals a player attempted, the lower the `FG%`.
+
+To dig deeper into the variables that affect `FG%`, each teams average field goal percentage over all the pre-pandemic seasons to compare team performances over each season. The plot showed no obvious trends in between the two variables. However, some interesting results were seen. It showed be noted that teams with grey spaces indicate teams that were either introduced or discontinued at some point in time in the range of the data. Those teams seem to have lower average `FG%` during their inaugural or final season. This can be attributed to teams performing poorly because players knew the franchise was being dissolved or players having to get adjusted to a new coach and new franchise.
+
+Another important aspect in team performance is the Coach. Several factors determine if a coach is considered "good", one of those being years of experience and time with that particular franchise. As a coach spends time with a franchise, they are able to learn and identify the strengths and weaknesses of the team and use them accordingly. For this reason, the relationship between coaching experience in years and average `FG%` was visualized. From there, there seemed to be a relationship that as the `years_w_team` increased, there was typically a higher average `FG%`, which could be attributed to the reasons listed above.
+
+```{r}
+#| label: data_wrangling_and_merging
+# correcting coaching data labs
+corrected_coaching_data <-
+  nba_coaching_data %>% 
+  mutate(team = fct_collapse(team, 
+                             `CHA` = c("CHO", "CHA", "CHH"),
+                             `BKN` = c("BRK"),
+                             `GS` = c("GSW"),
+                             `UTAH` = c("UTA"),
+                             `NJ` = c("NJN"),
+                             `NO` = c("NOH", "NOK", "NOP"),
+                             `NY` = c("NYK"),
+                             `PHX` = c("PHO"),
+                             `WSH` = c("WAS"),
+                             `SA` = c("SAS")
+                             
+  )) 
+
+pandemic_coaching_data <-
+  corrected_coaching_data %>% 
+  mutate(pandemic_status = fct_collapse(season, 
+                                        `pre-pandemic` = c("2001-2002","2002-2003", "2003-2004",
+                                                           "2004-2005","2005-2006","2006-2007",
+                                                           "2007-2008","2008-2009","2009-2010",
+                                                           "2010-2011","2011-2012", 
+                                                           "2012-2013","2013-2014",
+                                                           "2014-2015","2015-2016",
+                                                           "2016-2017", "2017-2018","2018-2019"),
+                                        `pandemic` = c("2019-2020", "2020-2021"),
+                                        `post-pandemic` = c("2021-2022")
+  )) 
+# filtering and joining datasets via keys
+pre_pandemic_coaching_data <-
+  pandemic_coaching_data %>% 
+  filter(pandemic_status == "pre-pandemic")
+  
+merged_pre_pandemic_data <-
+  full_join(pre_pandemic_nba_data, pre_pandemic_coaching_data)
+```
+
+```{r}
+#| label: plot_5
+merged_pre_pandemic_data %>% 
+  group_by(year_w_team) %>% 
+  summarise(avg_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = year_w_team, y = avg_field_goal)) +
+  geom_line() +
+  labs(title = "Average Field Goal Percentage v Coaching Experience Pre-Pandemic",
+       x = "Coaching Experience (Years)",
+       y = "Average Field Goal Percentage")
+```
+
+From exploring the relationship between `FG%` and multiple other variables during the pre-pandemic years provided an idea of what variables had an effect on `FG%` before the pandemic, which provides a baseline for the subsequent analyses.
+
+### Pandemic Analysis 
+
+When moving on to the next time period in this investigation, which is the seasons during the height of the pandemic, the following stipulations were made. The 2019-2020 and 2020-2021 seasons were considered "during the pandemic" because the NBA still had COVID restrictions and protocols implemented, including increased sanitation, regular COVID testing, and limited fan capacity. It should be noted that certain variables, such as `GP`, may be limited because during the height of the pandemic, the season came to a halt and things were reinstated in limited capacities.
+
+To begin, the game conditions were analyzed using the same criteria as stated above. Again, since this data was collected during the pandemic, it was expected that the value would be lower, in comparison to the pre-pandemic data, due to game restrictions and a hiatus to the 2019-2020 season.
+
+```{r}
+#| label: pandemic_game_conditions
+# subsetting for values that only occurred during the pandemic
+pandemic_nba_data <-
+  corrected_pandemic_data %>% 
+  filter(pandemic_status == "pandemic")
+
+# average game conditions
+pandemic_nba_data %>% 
+  select(GP, MIN) %>% 
+  summarise(avg_mins_played = mean(MIN, na.rm = TRUE),
+            avg_games_played = mean(GP, na.rm = TRUE))
+```
+
+
+As expected, there was a slight decrease in the average `MINS` played during the pandemic and an almost 10 game difference in the average games played (`GP`) during the season.
+
+From here, since this subsetted version of the original data set is significantly smaller than the pre-pandemic data, a frequency plot was used to get an idea of the distribution of the `FG%`. This was used to get an idea of if the `FG%` of players were more consistent under the pandemic conditions or if the pandemic increased variation.
+
+```{r}
+#| label: plot_6
+# pandemic frequency plot for distribution
+pandemic_nba_data %>% 
+  ggplot(mapping = aes(x = `FG%`)) +
+  # error message indicated use of more bins
+  geom_freqpoly(bins = 100) +
+  labs(x = "Field Goal Percentage",
+       y = "Count",
+       title = "The Distribution of Field Goal Percentages During the Pandemic")
+```
+
+This frequency plot indicated the distribution followed a similar pattern as in the pre-pandemic data, with majority of the `FG%` being in the 40% to 50% range. With no obvious change in the distribution patterns from the pre-pandemic to pandemic time frame, the distribution per season in the pandemic error was evaluated. Although there are only two seasons in the subsetted data set, the 2021-2022 `season` could be considered more "normal" in terms of COVID policies as the season returned to its regular format, instead of the "bubble" format used during the 2019-2020 `season`. 
+
+```{r}
+#| label: plot_7
+# analyzing distribution by season via boxplot
+pandemic_nba_data %>% 
+ggplot(mapping = aes(x = season, y = `FG%`)) +
+  geom_boxplot() +
+  labs(x = "Season",
+       y = "Field Goal Percentage",
+       title = "The Distribution of Field Goal Percentages per Season During the Pandemic")
+```
+From this visualization, one distinct thing was noticed with the peak pandemic season, 2019-2020, there were no outliers with `FG%` at 0% or 100%, which is observed in the 2020-2021 `season` and most of the pre-pandemic seasons, which can be seen in the plot "Field Goal Percentage Distribution per Season Pre-Pandemic". As described earlier, outliers of these values were typically attributed to players who did not see much action in games, which means that their `FGA` was low. When considering the bubble season (2019-2020), where there was an unpredictability if a player would be present in a game, due to constant COVID test and positive results, along with the data recording, per the source's standards, a player must play in at least 70% of games to have their stats recorded, there would be less opportunity for their to be outliers at the 0% and 100% point. There were many players who missed a significant amount of time, due to illness and other incidents, which means that there is a possibility that less player data was recorded, which limited the outlier values at the indicated percentages.
+
+Noticing this change, lead to the exploration of how a team's `FG%` changed during the pandemic seasons. Again, since the 2019-2020 `season` was during the peak of the pandemic, it was expected to see a huge contrast in the performance from this season to the next. However, based on the plot below, there is no consistent changes throughout the average `FG%`. Some teams improved from the previous season, some declined, and some remained constant, which indicated there is no relationship between the a team's performance and the duration the pandemic and its subsequent restrictions.
+
+```{r}
+#| label: plot_8
+# comparing team performance to FG% via tile
+pandemic_nba_data %>% 
+  group_by(team, season) %>% 
+  summarise(mean_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = season, y = team, fill = mean_field_goal)) +
+geom_tile() +
+  labs(title = "Average Field Goal Percentage per Team per Season During the Pandemic",
+                   x = "Season",
+                   y = "Team")
+```
+
+With no relationship being seen from these variables, coaching data was then analyzed. It should be noted again, due to data entry errors, there are some coaches from the 2019-2020 `season`. The relationship between coaching experience, measured with the years a coach spent with that particular team, and the average `FG%` was analyzed in this subsetted data. Although in the pre-pandemic data there was a relationship between higher `FG%` and more years with a specific team, this trend was not expected in this data set, since this was a situation most coaches had no experience with coaching in a confined setting like the bubble. 
+
+With no obvious link between `FG%` and other explored variables, `rank` was used to explore if there was a correlation between a higher `FG%` with players ranked higher. Although, this was during the pandemic, the same trend from the pre-pandemic data was expected; that players of a higher rank would have a higher `FG%`. This was expected because although game conditions changed, the best players would still rank highest in most categories. However, this trend was not observed. This could be related to the idea mentioned above that a player's preence in a game was circumstantial, so players of a lower rank may have had less game appearances, meaning less attempted shots and an opportunity for a higher `FG%` in comparison, due to less opportunities for missed shots, to players who appeared more regularly and had more variation in their `FG%`, which ultimately lowers higher ranking players average `FG%`.
+
+```{r}
+#| label: plot_9
+# comparing ranking and average field goal percentages
+pandemic_nba_data %>% 
+  group_by(rank) %>%
+  # using the same criteria of the best players being in the top 100
+  filter(rank <= 100) %>% 
+  summarise(mean_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = rank, y = mean_field_goal)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  labs(x = "Rank",
+       y = "Average Field Goal Percentage",
+       title = "The Average Field Goal Percentage for Players of a Certain Rank During the Pandemic")
+```
+
+```{r}
+#| label: plot_10
+# filtering out pandemic coaches
+pandemic_coaches <-
+  pandemic_coaching_data %>% 
+  filter(pandemic_status == "pandemic")
+
+# merging data
+merged_pandemic_data <-
+  full_join(pandemic_nba_data, pandemic_coaches)
+
+# comparing years of experience to `FG%`
+merged_pandemic_data %>% 
+  group_by(year_w_team) %>% 
+  summarise(avg_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = year_w_team, y = avg_field_goal)) +
+  geom_line() +
+  labs(title = "Average Field Goal Percentage v Coaching Experience During the Pandemic",
+       x = "Coaching Experience (Years)",
+       y = "Average Field Goal Percentage")
+```
+
+As expected, this trend did not appear in this subsetted data. In fact the complete opposite occurred with coaches with more than 10 years of experience had a steady decrease in their players' average `FG%`. This could be attributed to older coaches not being familiar with the increased technology used during the time of the pandemic, which could hinder their capability to perform duties effectively.
+
+After analyzing this pandemic season, there are very little obvious trends or continued patterns with team performance. These results were expected as the pandemic provided several challenges, aside from the physical health aspect. Not to mention, many players have spoken about the difficulties of playing the game with fans not in the stands, which could also lead to the unpredictability in the results. It should be noted that a few months before the pandemic began (2019-2020 season), basketball legend Kobe Bryant tragically and unexpectedly passed away. His death was met with an outpouring of grief from many players and cancelled games, which could have also caused a change in the average player performance.
+
+### Post-Pandemic Data Analysis 
+
+Before moving on to post-pandemic times, where things have reverted back to normal and all COVID precautions have been lifted, it should be noted that there has only been one completed season thus far that fits into this criteria. This means that there is limited observations in this data range and very few trends can be observed because there is only one season. However, this is still worth exploring as it could provide insight into what will be post-pandemic trends will be in the future.
+
+The same preliminary steps were conducted as in the previous sections, where game conditions were established via the `GP` and `MINS` variables. It was expected that there would be an increase in both values in comparison to the pandemic season. However, there was a slight decrease in both variables. This could be attributed to a decrease in physical stamina due to the pandemic hiatus, or even long COVID effects, such as fatigue, on players who tested positive during the pandemic.
+
+```{r}
+#| label: plot_11
+# subsetting for appropriate data
+post_pandemic_nba_data <-
+  corrected_pandemic_data %>% 
+  filter(pandemic_status == "post-pandemic")
+
+# game conditions
+post_pandemic_nba_data %>% 
+  select(GP, MIN) %>% 
+  summarise(avg_mins_played = mean(MIN, na.rm = TRUE),
+            avg_games_played = mean(GP, na.rm = TRUE))
+```
+
+
+To begin the analysis on this data set, the distribution of `FG%` over this season was looked at to see if there was more or less variation in the first post-pandemic season. A similar trend of the range between 45%-50% having the highest count, since this remained relatively constant throughout the entire data
+set. Outliers at the 0% and 100% values were expected again because of a normal amount of player circulation on the court, providing more opportunity for these extreme values to occur.
+
+```{r}
+#| label: plot_12
+post_pandemic_nba_data %>% 
+  ggplot(mapping = aes(x = `FG%`)) +
+  geom_freqpoly(bins = 100) +
+  labs(title = "The Distribution of the Field Goal Percentages Post-Pandemic",
+       x = "Field Goal Percentage")
+```
+
+The outlier values appeared as expected, however the range with the highest count decreased to between 35% to 45%. 
+
+With noticing this change, the relationship between player `rank` and `FG%` was analyzed to observe if players of a higher or lower `rank` had lower `FG%` to understand which group of players helped with the lowering of the most common `FG%` range.
+
+```{r}
+#| label: plot_13
+# relationship between `rank` and `FG%`
+post_pandemic_nba_data %>% 
+  group_by(rank) %>% 
+  filter(rank <= 100) %>% 
+  summarise(mean_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = rank, y = mean_field_goal)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  labs(x = "Rank",
+       y = "Average Field Goal Percentage",
+       title = "The Average Field Goal Percentage for Players of a Certain Rank Post-Pandemic")
+```
+The plot shows that the `FG%` was relatively consistent for the top 50 players and the latter 50 players, with more points higher than the trend line being seen in the latter 50 players. This plot speaks to the effects of the pandemic if all players were performing consistently below the common `FG%` range in comparison to past years, the main commonality between all players is the pandemic, which could affect player performance from both a physical and mental aspect.
+
+With this trend in mind, the relationship between coaching experience and `FG%` to see if coaching experience followed a similar trend of stability. 
+
+```{r}
+#| label: plot_14
+# merging data 
+# filtering coaching data 
+post_pandemic_coaches <-
+  pandemic_coaching_data %>% 
+  filter(pandemic_status == "post-pandemic")
+merged_post_pandemic_data <- 
+  full_join(post_pandemic_nba_data, post_pandemic_coaches)
+
+# comparing relationship between years of experience versus avg `FG%`
+merged_post_pandemic_data %>% 
+  group_by(year_w_team) %>% 
+  summarise(avg_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = year_w_team, y = avg_field_goal)) +
+  geom_line() +
+  labs(title = "Average Field Goal Percentage v Coaching Experience Post-Pandemic",
+       x = "Coaching Experience (Years)",
+       y = "Average Field Goal Percentage")
+```
+However, this trend did not occur, which can be seen above. In fact, a similar trend from the pandemic error was seen, where more years coaching, led to a steady decrease after roughly the 8 year mark. Again, this could be considered another victim of the pandemic, as there were many coaches who retired after the pandemic and the overall changes in the dynamics of the game could be hard for older coaches to adapt to.
+
+With all of this in mind, the post-pandemic trends defied all of the previously set trends, which was expected. The pandemic altered the lives of many, from physical and mental health effects, to social effects, there were many life altering events that could effect everyone, including athletes. These challenges are beginning to be reflected through player stats, as they depict a clear change in player performance post-pandemic, in comparison to the 18 year old trends that appeared beforehand.
+
+## Conclusion
+
+### All Data Comparison 
+
+When looking at the average game conditions of all periods of time, both the average `GP` and `MINS` has decreased both during and after the pandemic, which again was expected. However, the relative stability of `PTS` is surprising as one would think think that with less average `GP` and `MINS` would lead to lower points because of reduced time in the game. It is impossible to explain this, as the post-pandemic has one season worth of data, so it is imppossible to comment on the trends as of now because there is not enough data to determine if this average will increase, decrease, or remain stable.
+
+```{r}
+#| label: all_game_conditions
+# all game conditions
+  pandemic_classification_data %>% 
+  group_by(pandemic_status) %>% 
+  filter(pandemic_status != "NA") %>% 
+  select(GP, MIN, PTS) %>% 
+  summarise(avg_gp = mean(GP, na.rm = TRUE),
+            avg_mins = mean(MIN, na.rm = TRUE),
+            avg_points = mean(PTS, na.rm = TRUE))
+```
+
+When looking at the distribution of `FG%` of each time period, there is more variance in the data, which is expected. This is expected because there was more variance in the data due to rare circumstances influencing player performance, along with the fact that there is a "new normal" being established, that is influenced from pandemic experiences. These factors would lead to less cohesion in player performance; however, again it should be noted that there is minimal post-pandemic data, so this can not be considered a trend as of now, but it does provide some insight as to what will happen in coming seasons.
+
+```{r}
+#| label: plot_15
+# density plot creation
+pandemic_classification_data %>% 
+  group_by(pandemic_status) %>% 
+  filter(pandemic_status != "NA") %>% 
+  ggplot(mapping = aes(`FG%`)) +
+  # adding alpha argument for increased visability
+  geom_density(aes(fill=factor(pandemic_status)), alpha = 0.7) +
+  labs(title = "The Distribution of the Field Goal Percentages Over the Past 22 Years",
+       x = "Field Goal Percentage")
+```
+
+Finally, when comparing the average `FG%` for each time period, the change seems minimal, as seen in the plot below. Calculating, some simple summary statistics for each category, the lower count of observations for the post-pandemic era leads to higher summary statistics in comparisons to the other groups. The increase in `IQR` as the pandemic began and ended indicates more variance than previous error, which is explained above. Ultimately, `count` is important because it puts the other summary statistics in context as it shows that these results are preliminary, indicating that these may change over time as more observations are collected.
+
+```{r}
+#| label: plot_16_and_sum_stats
+# comparing the distributions to the average
+pandemic_classification_data %>% 
+  group_by(pandemic_status) %>% 
+  filter(pandemic_status != "NA") %>% 
+  summarise(avg_field_goal = mean(`FG%`)) %>% 
+  ggplot(mapping = aes(x = pandemic_status, 
+                       y =avg_field_goal,
+                       fill = pandemic_status)) +
+  geom_col() +
+  labs(title = "The Average Field Goal Percentages In Each Pandemic Stage",
+       x = "Pandemic Status",
+       y = "Average Field Goal Percentage")
+
+# collecting summary stats to explore distribution
+pandemic_classification_data %>% 
+  group_by(pandemic_status) %>% 
+  filter(pandemic_status != "NA") %>% 
+summarise(min = min(`FG%`),
+            max = max(`FG%`),
+            median = median(`FG%`),
+            Q1 = quantile(`FG%`, 0.25),
+            Q3 = quantile(`FG%`, 0.75),
+            IQR = IQR(`FG%`),
+            count = n())
+```
+
+### Closing Statement
+
+In conclusion, with the data collected and presented in this investigation, it can be argued that with available data there was not a decrease in player performance from the pandemic. However, there were significant changes and disruptions to previous trends that were consistent for almost two decades before the pandemic occurred. Things that used to impact player performance, such as a player's coach's experience or a player's rank, no longer followed the definitive patterns previously set, which lead to more variance in player performance. To further this study, consistent updating of the player and coach statistics as the data is made available would lead to more definitive trends and generalizations to be made.
+
+## References 
+[NBA Player Data](https://www.espn.com/nba/stats)
+[NBA Coaching Data](https://www.basketball-reference.com/leagues/NBA_2020_coaches.html)
